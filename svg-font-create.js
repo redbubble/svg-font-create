@@ -17,19 +17,32 @@ function parseSvgImage(data, filename) {
   var doc = (new DOMParser()).parseFromString(data, "application/xml");
   var svg = doc.getElementsByTagName('svg')[0];
 
-  if (!svg.hasAttribute('height')) {
-    throw filename ? 'Missed height attribute in ' + filename : 'Missed height attribute';
-  }
-  if (!svg.hasAttribute('width')) {
-    throw filename ? 'Missed width attribute in ' + filename : 'Missed width attribute';
+  var offsetX = 0;
+  var offsetY = 0;
+  var width;
+  var height;
+
+  if (svg.hasAttribute('viewBox')) {
+    var viewBox = svg.getAttribute('viewBox').match(/^(\S+) (\S+) (\S+) (\S+)$/);
+    offsetX = parseFloat(viewBox[1]);
+    offsetY = parseFloat(viewBox[2]);
+    width = parseFloat(viewBox[3]);
+    height = parseFloat(viewBox[4]);
   }
 
-  var height = svg.getAttribute('height');
-  var width  = svg.getAttribute('width');
+  if (!height) {
+    if (!svg.hasAttribute('height')) {
+      throw filename ? 'Missed viewBox or height attribute in ' + filename : 'Missed viewBox or height attribute';
+    }
+    height = parseFloat(svg.getAttribute('height'));
+  }
 
-  // Silly strip 'px' at the end, if exists
-  height = parseFloat(height);
-  width  = parseFloat(width);
+  if (!width) {
+    if (!svg.hasAttribute('width')) {
+      throw filename ? 'Missed viewBox or width attribute in ' + filename : 'Missed viewBox or width attribute';
+    }
+    width = parseFloat(svg.getAttribute('width'));
+  }
 
   var path = svg.getElementsByTagName('path');
 
@@ -53,6 +66,8 @@ function parseSvgImage(data, filename) {
   return {
     height    : height,
     width     : width,
+    offsetX   : offsetX,
+    offsetY   : offsetY,
     d         : d,
     transform : transform
   };
@@ -138,6 +153,10 @@ if (font.descent > 0) { font.descent = -font.descent; }
 
 var fontHeight = font.ascent - font.descent;
 
+console.log('Font ascent: ' + font.ascent);
+console.log('Font descent: ' + font.descent);
+console.log('Using font height: ' + fontHeight);
+
 console.log('Transforming coordinates');
 
 //
@@ -153,7 +172,9 @@ fstools.walkSync(args.input_dir, /[.]svg$/i, function (file) {
   // scale
   transform += ' scale(' + scale + ')';
   // vertical mirror
-  transform += ' translate(0 ' + (fontHeight / 2) + ') scale(1 -1) translate(0 ' + (-fontHeight / 2) + ')';
+  transform += ' translate(0 ' + (glyph.height / 2) + ') scale(1, -1) translate(0 ' + (-glyph.height / 2) + ')';
+  // viewbox shift
+  transform += ' translate(' + (-glyph.offsetX) + ' ' + (-glyph.offsetY) + ')';
 
   svgOut = svgImageTemplate({
     height : glyph.height,
